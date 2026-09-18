@@ -1,0 +1,14 @@
+{
+  "name": "ai-multiworker",
+  "owner": {
+    "name": "RodrigoAlexander7",
+    "url": "https://github.com/RodrigoAlexander7"
+  },
+  "plugins": [
+    {
+      "name": "ai-multiworker",
+      "source": "./",
+      "description": "Delegate token-heavy, low-reasoning work to cheaper Antigravity (agy) workers."
+    }
+  ]
+}

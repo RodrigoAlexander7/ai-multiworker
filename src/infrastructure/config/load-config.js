@@ -26,6 +26,7 @@ const DEFAULTS = {
  * @returns {Promise<MultiworkerConfig>}
  */
 export async function loadConfig(cwd = process.cwd()) {
+  /** @type {Partial<MultiworkerConfig>} */
   let fileConfig = {};
   try {
     const raw = await readFile(path.join(cwd, CONFIG_FILENAME), 'utf8');
@@ -36,7 +37,7 @@ export async function loadConfig(cwd = process.cwd()) {
 
   return {
     models: { ...DEFAULTS.models, ...(fileConfig.models ?? {}) },
-    thresholds: { ...DEFAULTS.thresholds, ...(fileConfig.thresholds ?? {}) },
+    thresholds: { ...DEFAULTS.thresholds, ...fileConfig.thresholds },
     timeoutMs: fileConfig.timeoutMs ?? DEFAULTS.timeoutMs,
     exemptPaths: fileConfig.exemptPaths ?? DEFAULTS.exemptPaths,
   };
