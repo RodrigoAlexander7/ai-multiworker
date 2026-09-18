@@ -6,14 +6,17 @@ import path from 'node:path';
 import { buildApp } from '../../composition.js';
 import { TASK_SPECS, TASK_IDS } from '../../domain/tasks.js';
 import { MultiworkerError } from '../../domain/errors.js';
+import { OUTPUT_COST_MULTIPLIER } from '../../domain/savings.js';
 import { readStdin } from './read-stdin.js';
 import { renderStats } from './stats.js';
+import { renderDoctor } from './doctor.js';
 
 const USAGE = `multiworker <task> --instruction "<what you need>" [options]
 
 Tasks:
 ${TASK_SPECS.map((spec) => `  ${spec.id.padEnd(15)} ${spec.summary}`).join('\n')}
   stats           Show delegation savings recorded so far.
+  doctor          Check the environment and print any missing setup.
 
 Options:
   --instruction, -i   What the worker must answer or produce (required).
@@ -34,6 +37,11 @@ async function main() {
 
   if (task === 'stats') {
     process.stdout.write(await renderStats());
+    return 0;
+  }
+
+  if (task === 'doctor') {
+    process.stdout.write(await renderDoctor());
     return 0;
   }
 
@@ -63,7 +71,7 @@ async function main() {
   const refs = values.file ?? [];
   const inlineContent = values.stdin ? await readStdin() : undefined;
 
-  if (refs.length === 0 && !inlineContent && task !== 'boilerplate') {
+  if (refs.length === 0 && !inlineContent) {
     process.stderr.write('Nothing to delegate: pass --file or --stdin.\n');
     return 2;
   }
@@ -92,19 +100,45 @@ async function main() {
     process.stdout.write(`${result.answer}\n`);
   }
 
+  if (result.deniedActions.length > 0) {
+    process.stderr.write(
+      `\n[multiworker] Partial answer: the worker was denied ${result.deniedActions.join(', ')}.\n` +
+        'Run "multiworker doctor" for the settings to add.\n',
+    );
+  }
+
   process.stdout.write(`\n${footer(result)}\n`);
   return 0;
 }
 
 /** @param {import('../../application/delegate-task.js').DelegateResult} result */
 function footer(result) {
-  const pct = Math.round(result.savings.savedRatio * 100);
+  const { avoidedInputTokens, avoidedOutputTokens, spentInputTokens, savedRatio } = result.savings;
+
+  const avoided =
+    avoidedOutputTokens > 0
+      ? `avoided~${avoidedInputTokens}in+${avoidedOutputTokens}out`
+      : `avoided~${avoidedInputTokens}in`;
+
+  // With nothing avoided there is no baseline, and "0%" would read as a failure
+  // rather than as an absent measurement.
+  const saved =
+    avoidedInputTokens === 0 && avoidedOutputTokens === 0
+      ? 'saved~n/a'
+      : `saved~${Math.round(savedRatio * 100)}%` +
+        // Without this the percentage looks wrong against the raw counts, since
+        // the avoided output is weighted before the ratio is taken.
+        (avoidedOutputTokens > 0 ? ` (out@${OUTPUT_COST_MULTIPLIER}x)` : '');
+
   return [
     `[multiworker] model=${result.model}`,
     `worker_tokens=${result.workerUsage.totalTokens}`,
-    `avoided~${result.savings.avoidedTokens}`,
-    `spent~${result.savings.spentTokens}`,
-    `saved~${pct}%`,
+    // Tokens alone hide the other half of the trade: a delegation that saves
+    // context but costs half a minute is a bad deal for interactive work.
+    `took=${result.durationSeconds.toFixed(1)}s`,
+    avoided,
+    `spent~${spentInputTokens}in`,
+    saved,
   ].join(' ');
 }
 
