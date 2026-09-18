@@ -130,6 +130,21 @@ test('metrics record the model that actually answered, not the one first tried',
   assert.equal(recorded[0].workerUsage.totalTokens, 12);
 });
 
+test('generation delivered to disk reports full savings', async () => {
+  const { worker } = fakeWorker(() => 'export const HTTP_OK = 200;');
+  const delegate = createDelegateTask({ worker, contentSource: fakeContentSource({}) });
+
+  const result = await delegate({
+    taskId: 'boilerplate',
+    instruction: 'export HTTP_OK',
+    answerEntersContext: false,
+  });
+
+  assert.equal(result.savings.spentTokens, 0);
+  assert.ok(result.savings.avoidedTokens > 0);
+  assert.equal(result.savings.savedRatio, 1);
+});
+
 test('inline content bypasses the content source for piped material', async () => {
   const { worker } = fakeWorker(() => 'two tests failed');
   const delegate = createDelegateTask({

@@ -20,14 +20,23 @@ export function estimateTokens(text) {
  */
 
 /**
+ * An answer delivered straight to disk is avoided output rather than spent
+ * input: the orchestrator pays for neither the material nor the result, so it
+ * counts on the avoided side instead of the spent one.
+ *
  * @param {string} rawMaterial
  * @param {string} workerAnswer
+ * @param {{ answerEntersContext?: boolean }} [options]
  * @returns {SavingsReport}
  */
-export function computeSavings(rawMaterial, workerAnswer) {
-  const avoidedTokens = estimateTokens(rawMaterial);
-  const spentTokens = estimateTokens(workerAnswer);
+export function computeSavings(rawMaterial, workerAnswer, options = {}) {
+  const { answerEntersContext = true } = options;
+  const answerTokens = estimateTokens(workerAnswer);
+
+  const avoidedTokens = estimateTokens(rawMaterial) + (answerEntersContext ? 0 : answerTokens);
+  const spentTokens = answerEntersContext ? answerTokens : 0;
   const savedTokens = avoidedTokens - spentTokens;
   const savedRatio = avoidedTokens === 0 ? 0 : savedTokens / avoidedTokens;
+
   return { avoidedTokens, spentTokens, savedTokens, savedRatio };
 }

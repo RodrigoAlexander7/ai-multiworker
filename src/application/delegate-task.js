@@ -24,6 +24,7 @@ const DEFAULT_TIMEOUT_MS = 240_000;
  * @property {readonly string[]} [refs] Paths or other identifiers the content source understands.
  * @property {string} [inlineContent] Material supplied directly instead of via refs.
  * @property {string} [model] Explicit override, bypassing the routing policy.
+ * @property {boolean} [answerEntersContext] False when the caller writes the answer straight to disk.
  */
 
 /**
@@ -65,7 +66,9 @@ export function createDelegateTask(deps) {
     const chain = command.model ? [command.model] : modelChainFor(spec.id, modelOverrides);
 
     const response = await runWithFallback(worker, chain, prompt, timeoutMs);
-    const savings = computeSavings(rawMaterial, response.result.text);
+    const savings = computeSavings(rawMaterial, response.result.text, {
+      answerEntersContext: command.answerEntersContext ?? true,
+    });
 
     await metrics?.record({
       taskId: spec.id,

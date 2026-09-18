@@ -50,6 +50,15 @@ test('savings stay defined when there was no material to avoid', () => {
   assert.equal(estimateTokens(''), 0);
 });
 
+test('an answer written to disk counts as avoided output, not spent input', () => {
+  const generated = 'z'.repeat(800);
+  const report = computeSavings('', generated, { answerEntersContext: false });
+
+  assert.equal(report.spentTokens, 0);
+  assert.equal(report.avoidedTokens, 200);
+  assert.equal(report.savedRatio, 1);
+});
+
 test('every task prompt forbids answering from outside the supplied sources', () => {
   for (const id of TASK_IDS) {
     const prompt = resolveTask(id).buildPrompt({

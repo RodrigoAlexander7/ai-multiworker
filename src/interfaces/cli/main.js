@@ -75,6 +75,7 @@ async function main() {
     refs,
     inlineContent,
     model: values.model,
+    answerEntersContext: !values.out,
   });
 
   if (values.json) {
