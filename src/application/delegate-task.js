@@ -2,7 +2,7 @@
 import { resolveTask } from '../domain/tasks.js';
 import { modelChainFor } from '../domain/routing-policy.js';
 import { computeSavings } from '../domain/savings.js';
-import { InputTooLargeError, WorkerFailedError } from '../domain/errors.js';
+import { InputTooLargeError, MultiworkerError, WorkerFailedError } from '../domain/errors.js';
 
 const DEFAULT_MAX_INPUT_CHARS = 4_000_000;
 const DEFAULT_TIMEOUT_MS = 240_000;
@@ -34,6 +34,8 @@ const DEFAULT_TIMEOUT_MS = 240_000;
  * @property {number} attempts
  * @property {import('../domain/savings.js').SavingsReport} savings
  * @property {import('./ports.js').WorkerUsage} workerUsage
+ * @property {number} durationSeconds Wall-clock cost of the delegation.
+ * @property {readonly string[]} deniedActions Permissions the worker lacked; the answer may be incomplete.
  */
 
 /**
@@ -66,8 +68,13 @@ export function createDelegateTask(deps) {
     const chain = command.model ? [command.model] : modelChainFor(spec.id, modelOverrides);
 
     const response = await runWithFallback(worker, chain, prompt, timeoutMs);
-    const savings = computeSavings(rawMaterial, response.result.text, {
-      answerEntersContext: command.answerEntersContext ?? true,
+    const answer = response.result.text;
+    const deliverToDisk = command.answerEntersContext === false;
+
+    const savings = computeSavings({
+      rawMaterial,
+      contextBound: deliverToDisk ? '' : answer,
+      diskBound: deliverToDisk ? answer : '',
     });
 
     await metrics?.record({
@@ -80,11 +87,13 @@ export function createDelegateTask(deps) {
     });
 
     return {
-      answer: response.result.text,
+      answer,
       model: response.result.model,
       attempts: response.attempts,
       savings,
       workerUsage: response.result.usage,
+      durationSeconds: response.result.durationSeconds,
+      deniedActions: response.result.deniedActions ?? [],
     };
   };
 }
@@ -105,6 +114,9 @@ async function runWithFallback(worker, chain, prompt, timeoutMs) {
       const result = await worker.run({ prompt, model, timeoutMs });
       return { result, attempts: index + 1 };
     } catch (error) {
+      // Only transient failures are worth another model; a misconfiguration
+      // would be rejected identically by every sibling.
+      if (error instanceof MultiworkerError && error.retryable === false) throw error;
       failures.push(`${model}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }

@@ -17,9 +17,18 @@ import { UnknownTaskError } from './errors.js';
  * @typedef {object} TaskSpec
  * @property {string} id
  * @property {string} summary
- * @property {'read'|'write'} side
  * @property {(input: TaskInput) => string} buildPrompt
  */
+
+/**
+ * Workers run headless, where every tool permission is auto-denied. Left to
+ * themselves they reach for one anyway — to run a command, to go read a file —
+ * and the turn dies with an empty answer.
+ */
+const NO_TOOLS = [
+  '- You have no tools. You cannot run commands, open files or browse. Work from',
+  '  the text in this prompt and nothing else.',
+].join('\n');
 
 /**
  * Workers are trusted blindly by the orchestrator, so every prompt forbids
@@ -29,6 +38,7 @@ import { UnknownTaskError } from './errors.js';
 const GROUNDING_CONTRACT = [
   'Rules:',
   '- Use ONLY the supplied material. Never rely on outside knowledge or guesses.',
+  NO_TOOLS,
   '- If the material does not contain the answer, reply exactly: NOT_IN_SOURCE',
   '- Cite the source label (and line number when visible) for every claim.',
   '- Be terse. No preamble, no restating the question, no closing offers of help.',
@@ -46,7 +56,6 @@ const SPECS = [
   {
     id: 'read',
     summary: 'Answer a question about large files without loading them into the orchestrator.',
-    side: 'read',
     buildPrompt: ({ instruction, documents }) =>
       [
         'You are a code-reading assistant. Answer the request using the sources below.',
@@ -59,26 +68,8 @@ const SPECS = [
       ].join('\n'),
   },
   {
-    id: 'search-digest',
-    summary: 'Filter noisy search output down to the genuinely relevant matches.',
-    side: 'read',
-    buildPrompt: ({ instruction, documents }) =>
-      [
-        'You are filtering raw search results. Keep only matches that genuinely satisfy the request.',
-        '',
-        GROUNDING_CONTRACT,
-        '- Output a list of `path:line — why it matches` and nothing else.',
-        '- Discard vendored, generated, minified and test-fixture noise unless the request asks for it.',
-        '',
-        `Request: ${instruction}`,
-        '',
-        renderDocuments(documents),
-      ].join('\n'),
-  },
-  {
     id: 'log-analysis',
     summary: 'Extract real failures from long test, build or runtime output.',
-    side: 'read',
     buildPrompt: ({ instruction, documents }) =>
       [
         'You are triaging long build/test/runtime output.',
@@ -94,37 +85,31 @@ const SPECS = [
       ].join('\n'),
   },
   {
-    id: 'docs',
-    summary: 'Draft documentation or docstrings from existing code.',
-    side: 'write',
+    id: 'docs-audit',
+    summary: 'Find claims in documentation that the code contradicts.',
     buildPrompt: ({ instruction, documents }) =>
       [
-        'You are writing documentation for the code below.',
+        'You are auditing documentation against the code it describes.',
         '',
-        GROUNDING_CONTRACT,
-        '- Document only behaviour visible in the sources. Never invent options or guarantees.',
-        '- Output the finished document body only, with no commentary around it.',
+        'Rules:',
+        NO_TOOLS,
+        '- Report ONLY claims the supplied code actively contradicts.',
+        // Docs legitimately cover install steps, rationale and context that no
+        // source file shows. Flagging those as problems buries the real findings.
+        '- A claim the sources simply do not cover is NOT a finding. Documentation',
+        '  describes things beyond the code, and absence is not contradiction.',
+        '- Never propose rewrites. Report what is wrong and what the code does instead.',
+        '- Quote the offending claim in under 15 words. Cite the doc location and',
+        '  the code location that disproves it.',
+        '- If nothing is contradicted, reply exactly: NO_DISCREPANCIES',
         '',
-        `Request: ${instruction}`,
+        'One block per finding, worst first:',
+        'CLAIM: "<quoted claim>" (<doc label>:<line>)',
+        'REALITY: <what the code actually does> (<code label>:<line>)',
+        '',
+        `Focus: ${instruction}`,
         '',
         renderDocuments(documents),
-      ].join('\n'),
-  },
-  {
-    id: 'boilerplate',
-    summary: 'Generate mechanical code fully determined by a specification.',
-    side: 'write',
-    buildPrompt: ({ instruction, documents }) =>
-      [
-        'You are generating mechanical boilerplate from a specification.',
-        '',
-        GROUNDING_CONTRACT,
-        '- Follow the specification literally. Make no design decisions of your own.',
-        '- If the specification is ambiguous, reply exactly: SPEC_AMBIGUOUS followed by the specific question.',
-        '- Output raw code only, with no markdown fences and no explanation.',
-        '',
-        `Specification: ${instruction}`,
-        documents.length > 0 ? `\n${renderDocuments(documents)}` : '',
       ].join('\n'),
   },
 ];
