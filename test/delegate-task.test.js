@@ -2,7 +2,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createDelegateTask } from '../src/application/delegate-task.js';
-import { InputTooLargeError, WorkerFailedError } from '../src/domain/errors.js';
+import {
+  InputTooLargeError,
+  WorkerFailedError,
+  WorkerPermissionError,
+} from '../src/domain/errors.js';
 
 /** @param {(model: string) => string | Error} respond */
 function fakeWorker(respond) {
@@ -52,7 +56,7 @@ test('delegation returns the worker answer with a savings report', async () => {
 
   assert.equal(result.answer, 'handler47, value 8137');
   assert.equal(result.attempts, 1);
-  assert.equal(result.savings.avoidedTokens, 2000);
+  assert.equal(result.savings.avoidedInputTokens, 2000);
   assert.ok(result.savings.savedRatio > 0.9);
 });
 
@@ -130,18 +134,33 @@ test('metrics record the model that actually answered, not the one first tried',
   assert.equal(recorded[0].workerUsage.totalTokens, 12);
 });
 
-test('generation delivered to disk reports full savings', async () => {
-  const { worker } = fakeWorker(() => 'export const HTTP_OK = 200;');
-  const delegate = createDelegateTask({ worker, contentSource: fakeContentSource({}) });
+test('a denied permission fails immediately instead of burning the fallback chain', async () => {
+  const { worker, calls } = fakeWorker(() => new WorkerPermissionError(['command']));
+  const delegate = createDelegateTask({ worker, contentSource: fakeContentSource({ 'a.js': 'code' }) });
+
+  await assert.rejects(
+    () => delegate({ taskId: 'read', instruction: 'q', refs: ['a.js'] }),
+    WorkerPermissionError,
+  );
+  assert.equal(calls.length, 1, 'every sibling model would be denied identically');
+});
+
+test('an answer delivered to disk reports full savings', async () => {
+  const { worker } = fakeWorker(() => 'a long digest of the sources');
+  const delegate = createDelegateTask({
+    worker,
+    contentSource: fakeContentSource({ 'a.js': 'code' }),
+  });
 
   const result = await delegate({
-    taskId: 'boilerplate',
-    instruction: 'export HTTP_OK',
+    taskId: 'read',
+    instruction: 'summarise',
+    refs: ['a.js'],
     answerEntersContext: false,
   });
 
-  assert.equal(result.savings.spentTokens, 0);
-  assert.ok(result.savings.avoidedTokens > 0);
+  assert.equal(result.savings.spentInputTokens, 0);
+  assert.ok(result.savings.avoidedOutputTokens > 0);
   assert.equal(result.savings.savedRatio, 1);
 });
 
