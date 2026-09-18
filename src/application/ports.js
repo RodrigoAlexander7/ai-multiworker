@@ -26,6 +26,7 @@
  * @property {string} model
  * @property {WorkerUsage} usage
  * @property {number} durationSeconds
+ * @property {readonly string[]} [deniedActions] Tool permissions the worker was refused.
  */
 
 /**

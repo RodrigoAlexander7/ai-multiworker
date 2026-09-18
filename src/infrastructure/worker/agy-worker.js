@@ -1,7 +1,7 @@
 // @ts-check
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
-import { WorkerFailedError } from '../../domain/errors.js';
+import { WorkerFailedError, WorkerPermissionError } from '../../domain/errors.js';
 
 /**
  * Node's spawn does not apply PATHEXT resolution unless a shell is used, and a
@@ -84,8 +84,15 @@ export function createAgyWorker(options = {}) {
         throw new WorkerFailedError(`${model} returned ${resultEvent.status}: ${resultEvent.error ?? 'unknown'}`);
       }
 
+      const deniedActions = (resultEvent.denied_actions ?? []).map(
+        (/** @type {any} */ action) => action.action ?? action.display_name ?? String(action),
+      );
+
       const text = String(resultEvent.response ?? '').trim();
       if (text === '') {
+        // A denied permission reports SUCCESS with an empty response, which would
+        // otherwise surface as a baffling blank answer.
+        if (deniedActions.length > 0) throw new WorkerPermissionError(deniedActions);
         throw new WorkerFailedError(`${model} returned an empty response`);
       }
 
@@ -93,6 +100,7 @@ export function createAgyWorker(options = {}) {
       return {
         text,
         model,
+        deniedActions,
         durationSeconds: resultEvent.duration_seconds ?? durationSeconds,
         usage: {
           inputTokens: usage.input_tokens ?? 0,
