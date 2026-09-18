@@ -11,12 +11,10 @@
 const DEFAULT_CHAINS = Object.freeze({
   // Extraction the orchestrator will trust without re-reading: accuracy over speed.
   read: ['gemini-3.8-flash-medium', 'gemini-3.7-flash-medium', 'gemini-3.6-flash-medium'],
-  // Mechanical filtering, no synthesis required.
-  'search-digest': ['gemini-3.8-flash-low', 'gemini-3.7-flash-low', 'gemini-3.6-flash-low'],
   'log-analysis': ['gemini-3.8-flash-medium', 'gemini-3.7-flash-medium', 'gemini-3.6-flash-medium'],
-  // Prose a human will read, and code that lands on disk: top tier.
-  docs: ['gemini-3.8-flash-high', 'gemini-3.7-flash-high', 'gemini-3.6-flash-high'],
-  boilerplate: ['gemini-3.8-flash-high', 'gemini-3.1-pro-high', 'gemini-3.7-flash-high'],
+  // Cross-checking prose against code is precision work: a sloppy auditor that
+  // reports absences as contradictions produces noise nobody will read twice.
+  'docs-audit': ['gemini-3.8-flash-high', 'gemini-3.1-pro-high', 'gemini-3.7-flash-high'],
 });
 
 const FALLBACK_CHAIN = Object.freeze(['gemini-3.8-flash-medium']);
