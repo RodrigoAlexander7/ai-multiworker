@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { judgeRead } from '../../domain/read-policy.js';
+import { bulkReadTarget } from '../../domain/bash-read.js';
 import { estimateTokens } from '../../domain/savings.js';
 import { loadConfig } from '../../infrastructure/config/load-config.js';
 import { readStdin } from '../cli/read-stdin.js';
@@ -22,7 +23,7 @@ async function main() {
   const cwd = payload.cwd ?? process.cwd();
   const config = await loadConfig(cwd);
 
-  const target = await resolveTarget(toolName, toolInput);
+  const target = resolveTarget(toolName, toolInput, config.thresholds.adviseLines);
   if (!target) return allow();
 
   if (config.exemptPaths.some((fragment) => target.includes(fragment))) return allow();
@@ -40,27 +41,20 @@ async function main() {
 }
 
 /**
- * Bash interception stays narrow — a whole-file dump through `cat`/`type` — so
- * that ordinary pipelines are never misread as wasteful reads.
- *
  * @param {string} toolName
  * @param {Record<string, any>} toolInput
- * @returns {Promise<string | null>}
+ * @param {number} adviseLines
+ * @returns {string | null}
  */
-async function resolveTarget(toolName, toolInput) {
+function resolveTarget(toolName, toolInput, adviseLines) {
   if (toolName === 'Read') {
     // A bounded slice is already cheap; the caller knows what they want.
     if (toolInput.offset != null || toolInput.limit != null) return null;
     return toolInput.file_path ?? null;
   }
 
-  if (toolName === 'Bash') {
-    const command = String(toolInput.command ?? '');
-    const match = /^\s*(?:cat|type)\s+(?:"([^"]+)"|'([^']+)'|(\S+))\s*$/.exec(command);
-    return match ? (match[1] ?? match[2] ?? match[3]) : null;
-  }
-
-  return null;
+  if (toolName !== 'Bash') return null;
+  return bulkReadTarget(String(toolInput.command ?? ''), adviseLines);
 }
 
 /** @param {string} target @param {string} cwd */
