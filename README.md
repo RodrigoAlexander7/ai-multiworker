@@ -40,6 +40,8 @@ Más dos comandos de soporte:
 
 - Node.js >= 18
 - [`agy`](https://antigravity.google) (Antigravity CLI) instalado y autenticado
+- Opcional: [`markitdown`](https://github.com/microsoft/markitdown) si vas a
+  delegar PDFs u ofimática — `pip install 'markitdown[all]'`
 
 Funciona igual en Windows y en Linux: todo es Node, sin scripts de shell por
 plataforma.
@@ -107,6 +109,23 @@ multiworker read -i "¿Cómo fluye el pago de punta a punta?" -f src/checkout.js
 
 La respuesta viene con citas `archivo:línea`. Usalas para abrir con
 `Read`/`offset` solo las líneas que importan, en vez de releer todo.
+
+### Documentos que no son texto
+
+Los `.pdf`, `.docx`, `.pptx`, `.xlsx`, `.epub`, `.html` y `.htm` se convierten a
+Markdown automáticamente antes de delegarse. No hay paso extra:
+
+```bash
+multiworker read -i "¿qué método usan y con qué tamaño de muestra?" -f paper.pdf
+```
+
+Sin la conversión esos archivos se leerían como UTF-8 y llegarían al worker como
+ruido binario — no fallaría, que es peor: respondería con seguridad sobre basura.
+El HTML entra en la lista por otro motivo: su markup puede pesar varias veces más
+que su prosa, y Markdown lleva lo mismo por mucho menos.
+
+Requiere `markitdown`. Si falta, el error te dice cómo instalarlo, y
+`multiworker doctor` lo reporta.
 
 ### Triar salidas largas
 
