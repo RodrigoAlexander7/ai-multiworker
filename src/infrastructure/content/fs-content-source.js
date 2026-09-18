@@ -2,6 +2,7 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { MultiworkerError } from '../../domain/errors.js';
+import { needsConversion, convertToMarkdown } from './markitdown.js';
 
 /**
  * Line numbers are baked in so the worker can cite `path:line` accurately; the
@@ -44,7 +45,10 @@ export function createFsContentSource(options = {}) {
       return Promise.all(
         refs.map(async (ref) => {
           const resolved = assertInsideRoots(ref);
-          const raw = await readFile(resolved, 'utf8');
+          const raw = needsConversion(resolved)
+            ? await convertToMarkdown(resolved)
+            : await readFile(resolved, 'utf8');
+
           return {
             label: path.relative(process.cwd(), resolved) || resolved,
             content: withLineNumbers(raw),
