@@ -30,6 +30,11 @@ npm test 2>&1 | node "$CLI" log-analysis -i "which tests failed and why" --stdin
 node "$CLI" docs-audit -i "check the examples and signatures" -f README.md -f src/index.js
 ```
 
+PDFs and office documents work directly — `.pdf`, `.docx`, `.pptx`, `.xlsx`,
+`.epub` and `.html` are converted to Markdown before delegation, so a paper or a
+spec can be passed with `-f` like any source file. That conversion needs
+`markitdown`; without it the error says how to install it.
+
 ## When it pays
 
 One question decides it: **is the material large and the answer small?**

@@ -1,6 +1,7 @@
 // @ts-check
 import { spawnSync } from 'node:child_process';
 import { loadConfig, CONFIG_FILENAME } from '../../infrastructure/config/load-config.js';
+import { markitdownAvailable } from '../../infrastructure/content/markitdown.js';
 
 /** @param {string} [cwd] */
 export async function renderDoctor(cwd = process.cwd()) {
@@ -20,6 +21,12 @@ export async function renderDoctor(cwd = process.cwd()) {
     lines.push('  $env:AGY_BIN = "C:\\path\\to\\agy.exe"  # Windows PowerShell');
     return `${lines.join('\n')}\n`;
   }
+
+  const converter = markitdownAvailable()
+    ? 'available'
+    : "missing — pip install 'markitdown[all]'";
+  lines.push(`markitdown  ${converter}`);
+  lines.push('            optional: only pdf, docx, pptx, xlsx, epub and html need it');
 
   const config = await loadConfig(cwd);
   lines.push('');
