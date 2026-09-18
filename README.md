@@ -209,6 +209,12 @@ Tres capas:
 1. **Hook `PreToolUse`** — mide el archivo que Claude está por leer. Por debajo
    de 300 líneas no dice nada; desde 300 sugiere delegar; desde 800 bloquea la
    lectura directa y propone el comando exacto.
+
+   Cubre la herramienta `Read` y los volcados por shell (`cat`, `type`, `less`,
+   `more`, y `head`/`tail` con un conteo explícito grande). Deja pasar lo que ya
+   es barato: lecturas con `offset`/`limit`, `head`/`tail` con su límite por
+   defecto, comandos con pipe —la salida se filtra antes de que alguien la lea—
+   y redirecciones, que nunca llegan al contexto.
 2. **CLI `multiworker`** — arma el prompt, elige el modelo según la tarea, llama
    a `agy` por NDJSON y devuelve solo la respuesta.
 3. **Skill `delegating-work`** — le enseña a Claude qué conviene delegar y qué no.
