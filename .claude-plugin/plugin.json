@@ -1,0 +1,12 @@
+{
+  "name": "ai-multiworker",
+  "version": "0.1.0",
+  "description": "Delegate token-heavy, low-reasoning work to cheaper Antigravity (agy) workers so the orchestrator's context stays for reasoning.",
+  "author": {
+    "name": "RodrigoAlexander7",
+    "url": "https://github.com/RodrigoAlexander7/ai-multiworker"
+  },
+  "homepage": "https://github.com/RodrigoAlexander7/ai-multiworker",
+  "license": "MIT",
+  "keywords": ["tokens", "delegation", "antigravity", "gemini", "cost"]
+}
