@@ -1,5 +1,6 @@
 {
   "name": "ai-multiworker",
+  "description": "Tooling to cut Claude Code token usage by delegating I/O-heavy work to cheaper Antigravity workers.",
   "owner": {
     "name": "RodrigoAlexander7",
     "url": "https://github.com/RodrigoAlexander7"
