@@ -1,6 +1,6 @@
 ---
 name: delegating-work
-description: Delegate token-heavy, low-reasoning work to a cheaper worker model instead of loading it into context. Use when about to read a large file, sift through noisy grep or search output, triage long test/build/CI logs, write documentation or docstrings from existing code, or generate mechanical boilerplate from a specification.
+description: Delegate token-heavy, low-reasoning work to a cheaper worker model instead of loading it into context. Use when about to read a large file, triage long test/build/CI output, or check whether documentation still matches the code.
 ---
 
 # Delegating work to cheap workers
@@ -16,62 +16,56 @@ Run delegations with:
 node "${CLAUDE_PLUGIN_ROOT}/src/interfaces/cli/main.js" <task> -i "<instruction>" [-f <file>...] [--stdin]
 ```
 
-## What to delegate
+## The three tasks
 
 | Task | Use it for |
 |---|---|
 | `read` | Answering a question about one or more large files. |
-| `search-digest` | Cutting noisy grep/ripgrep output down to the real matches. |
 | `log-analysis` | Pulling root-cause failures out of long test, build or CI output. |
-| `docs` | Drafting documentation, READMEs or docstrings from existing code. |
-| `boilerplate` | Generating mechanical code fully determined by a specification. |
-
-Files go in with `-f`. Piped material goes in with `--stdin`:
+| `docs-audit` | Checking whether documentation still matches the code. |
 
 ```bash
-rg -n "createUser" --stats | node "$CLI" search-digest -i "where is the real definition, ignoring tests" --stdin
-npm test 2>&1 | node "$CLI" log-analysis -i "which tests actually failed and why" --stdin
+node "$CLI" read -i "where is the session token validated" -f src/auth/session.js
+npm test 2>&1 | node "$CLI" log-analysis -i "which tests failed and why" --stdin
+node "$CLI" docs-audit -i "check the examples and signatures" -f README.md -f src/index.js
 ```
 
-For `boilerplate`, send the result straight to disk with `-o` so the generated
-code never passes through your context at all:
+## When it pays
 
-```bash
-node "$CLI" boilerplate -i "<precise spec>" -o src/generated/types.ts
-```
+One question decides it: **is the material large and the answer small?**
+
+Delegation costs 10-30 seconds of latency and a fixed prompt overhead. Below
+roughly 300 lines a direct read is cheaper on both. The footer reports tokens
+*and* elapsed time so the trade stays visible — check it.
+
+Answers cite `path:line`. Use those citations to `Read` the few lines that
+matter instead of reopening the whole file.
 
 ## What NOT to delegate
 
-**Anything where writing the instruction costs about as much as doing the work.**
-This is the trap. If a worker needs a specification precise enough that it
-cannot go wrong, you have already spent the tokens you were trying to save, and
-you have added a misinterpretation risk on top. Boilerplate qualifies only when
-it is genuinely mechanical — DTOs, barrel files, fixtures, i18n tables, config
-scaffolding — not merely "simple".
-
-Also keep for yourself:
-
-- Business logic and anything requiring judgment about the codebase.
-- Architecture decisions and cross-file refactors.
-- Small files. Below roughly 300 lines a direct read is cheaper than the
-  worker's fixed overhead and several seconds of latency.
-- Text you need verbatim in order to edit it. Use `Read` with `offset`/`limit`
-  to fetch just the slice you will modify.
+- Business logic, architecture decisions, cross-file refactors. Here the work
+  *is* the judgment.
+- The **why** behind code — the decision, the incident, the constraint. That is
+  not in the source, so a worker will invent something plausible, which is worse
+  than silence because it reads as authoritative.
+- Small files, and text you need verbatim to edit. Use `Read` with
+  `offset`/`limit` for the slice you will modify.
+- Anything you cannot verify more cheaply than you could do it yourself.
 
 ## Reading the results
 
-Workers are told to stay strictly inside the material they are given, so:
+Workers are told to stay strictly inside the material they are given:
 
 - **`NOT_IN_SOURCE`** means the answer is genuinely absent. Widen the file set
-  and delegate again — do not assume the worker simply missed it.
-- **`SPEC_AMBIGUOUS`** (from `boilerplate`) means your specification had a real
-  gap. Resolve the question it raises, then re-delegate.
-- Answers cite `path:line`. Use those citations to `Read` the few lines that
-  matter rather than reopening the whole file.
+  and delegate again — do not assume the worker missed it.
+- **`NO_DISCREPANCIES`** (from `docs-audit`) means the docs still hold. It costs
+  almost nothing, so run it after any change to a public interface.
+
+`docs-audit` reports only claims the code *contradicts*. A claim the sources do
+not cover is not a finding, and it proposes no rewrites.
 
 Treat a worker answer as a report from a junior teammate: reliable on
-extraction, and worth verifying before you build something load-bearing on top
-of it.
+extraction, worth verifying before you build something load-bearing on it.
 
 ## Checking the payoff
 
@@ -79,5 +73,4 @@ of it.
 node "${CLAUDE_PLUGIN_ROOT}/src/interfaces/cli/main.js" stats
 ```
 
-Every delegation is recorded with the tokens it avoided and the tokens its
-answer cost.
+Every delegation records the tokens it avoided and the tokens its answer cost.
