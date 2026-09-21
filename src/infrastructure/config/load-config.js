@@ -11,6 +11,15 @@ const CONFIG_FILENAME = '.multiworker.json';
  * @property {{ adviseLines: number, blockLines: number }} thresholds
  * @property {number} timeoutMs
  * @property {string[]} exemptPaths Globless substrings; a matching path is never intercepted.
+ * @property {readonly DocsAuditPair[]} docsAudits
+ */
+
+/**
+ * @typedef {object} DocsAuditPair
+ * @property {string} doc
+ * @property {readonly string[]} code
+ * @property {string} focus What to check — kept mandatory so each pair stays a
+ *   focused audit instead of a vague "check everything" pass.
  */
 
 /** @type {MultiworkerConfig} */
@@ -19,6 +28,7 @@ const DEFAULTS = {
   thresholds: { ...DEFAULT_THRESHOLDS },
   timeoutMs: 240_000,
   exemptPaths: [],
+  docsAudits: [],
 };
 
 /**
@@ -40,6 +50,7 @@ export async function loadConfig(cwd = process.cwd()) {
     thresholds: { ...DEFAULTS.thresholds, ...fileConfig.thresholds },
     timeoutMs: fileConfig.timeoutMs ?? DEFAULTS.timeoutMs,
     exemptPaths: fileConfig.exemptPaths ?? DEFAULTS.exemptPaths,
+    docsAudits: fileConfig.docsAudits ?? DEFAULTS.docsAudits,
   };
 }
 

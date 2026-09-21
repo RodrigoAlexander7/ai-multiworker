@@ -7,10 +7,12 @@ import { buildApp } from '../../composition.js';
 import { TASK_SPECS, TASK_IDS } from '../../domain/tasks.js';
 import { MultiworkerError } from '../../domain/errors.js';
 import { OUTPUT_COST_MULTIPLIER } from '../../domain/savings.js';
+import { runDocsAudits } from '../../application/run-docs-audits.js';
 import { readStdin } from './read-stdin.js';
 import { renderStats } from './stats.js';
 import { renderComplianceStats } from './compliance-stats.js';
 import { renderDoctor } from './doctor.js';
+import { CONFIG_FILENAME } from '../../infrastructure/config/load-config.js';
 
 const USAGE = `multiworker <task> --instruction "<what you need>" [options]
 
@@ -26,6 +28,8 @@ Options:
   --out, -o           Write the answer to this path instead of stdout.
   --model             Bypass the routing policy with an explicit model id.
   --json              Emit a machine-readable result.
+  --all               docs-audit only: run every pair configured under
+                      "docsAudits" in ${CONFIG_FILENAME}, instead of -i/-f.
 `;
 
 async function main() {
@@ -61,9 +65,18 @@ async function main() {
       out: { type: 'string', short: 'o' },
       model: { type: 'string' },
       json: { type: 'boolean', default: false },
+      all: { type: 'boolean', default: false },
     },
     allowPositionals: false,
   });
+
+  if (values.all) {
+    if (task !== 'docs-audit') {
+      process.stderr.write('--all is only defined for docs-audit.\n');
+      return 2;
+    }
+    return runAllDocsAudits(values.json === true);
+  }
 
   if (!values.instruction) {
     process.stderr.write('Missing --instruction.\n\n' + USAGE);
@@ -111,6 +124,53 @@ async function main() {
 
   process.stdout.write(`\n${footer(result)}\n`);
   return 0;
+}
+
+/**
+ * @param {boolean} json
+ * @returns {Promise<number>}
+ */
+async function runAllDocsAudits(json) {
+  const { delegateTask, config } = await buildApp();
+
+  if (config.docsAudits.length === 0) {
+    process.stderr.write(
+      [
+        `No "docsAudits" configured in ${CONFIG_FILENAME}. Add pairs, e.g.:`,
+        '',
+        '  {',
+        '    "docsAudits": [',
+        '      { "doc": "docs/api.md", "code": ["src/api/routes.py"], "focus": "endpoints and payloads" }',
+        '    ]',
+        '  }',
+        '',
+        'Each pair is one focused audit — the focus keeps the worker checking',
+        'something specific instead of everything at once.',
+      ].join('\n') + '\n',
+    );
+    return 2;
+  }
+
+  const results = await runDocsAudits(config.docsAudits, delegateTask);
+
+  if (json) {
+    process.stdout.write(`${JSON.stringify(results, null, 2)}\n`);
+  } else {
+    for (const item of results) {
+      process.stdout.write(`\n=== ${item.doc} — ${item.focus} ===\n`);
+      process.stdout.write(item.error ? `ERROR: ${item.error}\n` : `${item.result?.answer}\n`);
+    }
+  }
+
+  const failed = results.filter((item) => item.error).length;
+  const clean = results.filter((item) => item.result?.answer.trim() === 'NO_DISCREPANCIES').length;
+
+  process.stdout.write(
+    `\n[multiworker] ${results.length} pair(s), ${clean} clean, ` +
+      `${results.length - clean - failed} with findings, ${failed} failed\n`,
+  );
+
+  return failed === results.length ? 1 : 0;
 }
 
 /** @param {import('../../application/delegate-task.js').DelegateResult} result */
