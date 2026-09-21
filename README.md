@@ -203,7 +203,33 @@ conviene verificarla antes de construir algo encima.
 Evitar un token que ibas a *escribir* vale unas cinco veces más que evitar uno
 que ibas a *leer*, porque la salida se factura a ese ratio.
 
-`multiworker stats` agrega lo mismo acumulado.
+`multiworker stats` agrega lo mismo acumulado, y le suma una segunda mitad que
+responde una pregunta distinta: **¿se está usando cuando debería?**
+
+Un hook `PostToolUse` observa cada `Read`/`Bash` que se completa. No bloquea
+nada — corre después de que la lectura ya pasó. Si el archivo estaba en la
+banda advisory (300-800 líneas) y se leyó directo en vez de delegarse, queda
+registrado en `.multiworker/compliance.jsonl`, separado de las métricas de
+delegación:
+
+```
+Compliance: 3 large read(s) went direct instead of being delegated.
+  advised and ignored: 3
+  block bypassed:      0
+
+Worst offenders:
+    540 lines  src/legacy/parser.js (Read)
+```
+
+Esto ataca el problema que el hook `PreToolUse` no puede resolver solo: en la
+banda advisory, sugiere pero no obliga, así que Claude puede ignorarlo. Antes
+eso no dejaba rastro. Ahora sí, y con eso podés calibrar el umbral con datos en
+vez de intuición — si `advised and ignored` crece mucho, bajá `blockLines` en
+`.multiworker.json` en vez de confiar en que la sugerencia se siga.
+
+`block bypassed` (que la lectura haya pasado por encima de 800 líneas pese al
+bloqueo duro) no debería ocurrir nunca. Si aparece, es una señal de que el
+`PreToolUse` no está corriendo o la config cambió entre ambos hooks — revisalo.
 
 > **Las estimaciones son `chars / 4`**, no un tokenizer real. Sirven para comparar
 > delegaciones entre sí, no para auditar tu factura.

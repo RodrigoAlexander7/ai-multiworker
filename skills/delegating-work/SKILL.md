@@ -72,10 +72,14 @@ not cover is not a finding, and it proposes no rewrites.
 Treat a worker answer as a report from a junior teammate: reliable on
 extraction, worth verifying before you build something load-bearing on it.
 
-## Checking the payoff
+## Checking the payoff — and the misses
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/src/interfaces/cli/main.js" stats
 ```
 
 Every delegation records the tokens it avoided and the tokens its answer cost.
+A second, separate log tracks the opposite failure: a file in the advisory band
+(300-800 lines) that got read directly instead. The advisory suggests,
+it does not block — reading `stats`' "Compliance" section after a session is
+the honest check on whether that suggestion was actually followed.
