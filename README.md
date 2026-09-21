@@ -163,6 +163,41 @@ código, y confundir ausencia con contradicción produce ruido que nadie relee.
 Si todo está bien devuelve `NO_DISCREPANCIES`, y eso cuesta casi nada. Corrélo
 después de cada cambio grande.
 
+### Auditar todo el proyecto de una vez
+
+Para un proyecto con varios documentos, escribir cada par a mano se vuelve
+tedioso. Configurá los pares en `.multiworker.json`:
+
+```json
+{
+  "docsAudits": [
+    { "doc": "docs/api.md", "code": ["src/api/routes.py"], "focus": "endpoints y payloads" },
+    { "doc": "docs/cli.md", "code": ["src/cli/main.py"], "focus": "comandos y flags" }
+  ]
+}
+```
+
+Y corré todos de una vez:
+
+```bash
+multiworker docs-audit --all
+```
+
+Cada par sigue siendo una auditoría **enfocada e independiente** — el `focus`
+es obligatorio a propósito. Una sola llamada que barra todo el código pierde
+justo lo que hace preciso al auditor: sin un foco concreto, no puede distinguir
+bien entre "el código lo contradice" y "las fuentes simplemente no lo cubren".
+`--all` automatiza juntar los pares, no la precisión de cada auditoría.
+
+Un par que falla (archivo inexistente, timeout) no frena a los demás — se
+reporta y el resto sigue. Al final:
+
+```
+[multiworker] 5 pair(s), 4 clean, 1 with findings, 0 failed
+```
+
+Sale con código 1 solo si **todos** los pares fallaron.
+
 ### Rutina sugerida
 
 | Cuándo | Comando |
@@ -315,6 +350,7 @@ Opcional, en `.multiworker.json` en la raíz del proyecto:
 | `thresholds.blockLines` | Desde cuántas líneas el hook bloquea la lectura directa |
 | `timeoutMs` | Timeout por delegación |
 | `exemptPaths` | Fragmentos de ruta que el hook nunca intercepta |
+| `docsAudits` | Pares doc↔código para `docs-audit --all` (ver arriba) |
 
 Variable de entorno: `AGY_BIN` para un binario de `agy` no estándar.
 

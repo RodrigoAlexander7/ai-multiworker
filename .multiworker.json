@@ -1,0 +1,14 @@
+{
+  "docsAudits": [
+    {
+      "doc": "README.md",
+      "code": ["src/domain/tasks.js", "src/domain/routing-policy.js"],
+      "focus": "task names, model routing and thresholds"
+    },
+    {
+      "doc": "skills/delegating-work/SKILL.md",
+      "code": ["src/domain/tasks.js", "src/interfaces/cli/main.js"],
+      "focus": "example commands, flags and output values"
+    }
+  ]
+}
