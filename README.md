@@ -63,8 +63,14 @@ claude plugin install ai-multiworker@ai-multiworker
 git clone https://github.com/RodrigoAlexander7/ai-multiworker.git
 cd ai-multiworker
 npm install
-node src/interfaces/cli/main.js doctor
+npm link
+multiworker doctor
 ```
+
+`npm link` expone el comando `multiworker` en tu PATH. Sin ese paso solo existe
+como `node src/interfaces/cli/main.js` dentro de esta carpeta. Si tu terminal ya
+estaba abierta cuando corriste `npm link`, abrí una nueva — el PATH se resuelve
+al iniciar la sesión.
 
 Si `agy` no resuelve en el PATH, apuntá `AGY_BIN` al binario:
 
