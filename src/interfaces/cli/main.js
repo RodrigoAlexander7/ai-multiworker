@@ -9,13 +9,14 @@ import { MultiworkerError } from '../../domain/errors.js';
 import { OUTPUT_COST_MULTIPLIER } from '../../domain/savings.js';
 import { readStdin } from './read-stdin.js';
 import { renderStats } from './stats.js';
+import { renderComplianceStats } from './compliance-stats.js';
 import { renderDoctor } from './doctor.js';
 
 const USAGE = `multiworker <task> --instruction "<what you need>" [options]
 
 Tasks:
 ${TASK_SPECS.map((spec) => `  ${spec.id.padEnd(15)} ${spec.summary}`).join('\n')}
-  stats           Show delegation savings recorded so far.
+  stats           Show delegation savings and missed advisories so far.
   doctor          Check the environment and print any missing setup.
 
 Options:
@@ -37,6 +38,7 @@ async function main() {
 
   if (task === 'stats') {
     process.stdout.write(await renderStats());
+    process.stdout.write(`\n${await renderComplianceStats()}\n`);
     return 0;
   }
 
