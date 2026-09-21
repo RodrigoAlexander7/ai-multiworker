@@ -22,6 +22,8 @@ export async function renderDoctor(cwd = process.cwd()) {
     return `${lines.join('\n')}\n`;
   }
 
+  lines.push(`link     ${multiworkerLinked() ? 'multiworker is on PATH' : 'NOT on PATH — run "npm link" from this repo, then open a new terminal'}`);
+
   const converter = markitdownAvailable()
     ? 'available'
     : "missing — pip install 'markitdown[all]'";
@@ -52,4 +54,18 @@ function locateAgy() {
   const binary = process.env.AGY_BIN ?? (process.platform === 'win32' ? 'agy.exe' : 'agy');
   const probe = spawnSync(binary, ['--help'], { shell: false, encoding: 'utf8' });
   return probe.error ? null : binary;
+}
+
+/**
+ * Checked independently of how this process itself was launched: doctor can
+ * run via `node src/interfaces/cli/main.js` even when the global link is
+ * missing, which is exactly the case this warns about.
+ *
+ * `npm link` puts a `.cmd` shim on Windows, and `.cmd` is a script, not a PE
+ * binary — CreateProcess cannot launch it directly, only cmd.exe can. `shell:
+ * true` is safe here because the command is a fixed literal, not user input.
+ */
+function multiworkerLinked() {
+  const probe = spawnSync('multiworker --help', { shell: true, encoding: 'utf8' });
+  return !probe.error && probe.status === 0;
 }
