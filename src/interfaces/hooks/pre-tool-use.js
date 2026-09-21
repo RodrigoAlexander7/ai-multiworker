@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { judgeRead } from '../../domain/read-policy.js';
-import { bulkReadTarget } from '../../domain/bash-read.js';
+import { resolveReadTarget } from '../../domain/read-target.js';
 import { estimateTokens } from '../../domain/savings.js';
 import { loadConfig } from '../../infrastructure/config/load-config.js';
 import { readStdin } from '../cli/read-stdin.js';
@@ -23,7 +23,7 @@ async function main() {
   const cwd = payload.cwd ?? process.cwd();
   const config = await loadConfig(cwd);
 
-  const target = resolveTarget(toolName, toolInput, config.thresholds.adviseLines);
+  const target = resolveReadTarget(toolName, toolInput, config.thresholds.adviseLines);
   if (!target) return allow();
 
   if (config.exemptPaths.some((fragment) => target.includes(fragment))) return allow();
@@ -38,23 +38,6 @@ async function main() {
   return verdict === 'block'
     ? deny(`${reason(target, stat)}\n\n${suggestion}`)
     : allow(`${reason(target, stat)} Consider delegating:\n${suggestion}`);
-}
-
-/**
- * @param {string} toolName
- * @param {Record<string, any>} toolInput
- * @param {number} adviseLines
- * @returns {string | null}
- */
-function resolveTarget(toolName, toolInput, adviseLines) {
-  if (toolName === 'Read') {
-    // A bounded slice is already cheap; the caller knows what they want.
-    if (toolInput.offset != null || toolInput.limit != null) return null;
-    return toolInput.file_path ?? null;
-  }
-
-  if (toolName !== 'Bash') return null;
-  return bulkReadTarget(String(toolInput.command ?? ''), adviseLines);
 }
 
 /** @param {string} target @param {string} cwd */
